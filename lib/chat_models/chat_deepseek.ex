@@ -385,10 +385,20 @@ defmodule LangChain.ChatModels.ChatDeepSeek do
         ) ::
           %{String.t() => any()} | [%{String.t() => any()}]
   def for_api(%_{} = model, %Message{content: content} = msg) when is_list(content) do
-    %{
-      "role" => msg.role,
-      "content" => ContentPart.content_to_string(content)
-    }
+    reasoning_content = ContentPart.content_to_string(content, :thinking)
+    message = if is_nil(reasoning_content) do
+      %{
+        "role" => msg.role,
+        "content" => ContentPart.content_to_string(content)
+      }
+    else
+      %{
+        "role" => msg.role,
+        "content" => ContentPart.content_to_string(content),
+        "reasoning_content" => reasoning_content
+      }
+    end
+    message
     |> Utils.conditionally_add_to_map("name", msg.name)
     |> Utils.conditionally_add_to_map(
       "tool_calls",
@@ -972,7 +982,7 @@ defmodule LangChain.ChatModels.ChatDeepSeek do
 
   # Delta message tool call
   def do_process_response(
-        model,
+        %ChatDeepSeek{model: "deepseek-reasoner"} = model,
         %{"delta" => delta_body} = msg
       ) do
     # finish_reason might not be present in all streaming responses
